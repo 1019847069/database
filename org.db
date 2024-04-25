@@ -1,0 +1,76 @@
+#sed '/^##/d' eggnog_out |sed 's/#//' >eggnog.anno,shell 中实验
+library(dplyr)
+library(stringr)
+library(AnnotationForge)
+# 设置工作目录
+setwd("E:/AAA/R/16_6/")
+
+#如果用read.csv报错，尝试read.table("eggnog.anno",header=T,sep="\t")，或者试试egg <- rio::import('emapper.annotations.tsv')。
+egg<-read.csv("out.emapper.annotations",header=T,sep="\t") 
+read.table("out.emapper.annotations",header=T,sep="\t")
+#把空行标记上NA
+egg[egg==""] <- NA 
+
+#列出标题行
+colnames(egg) 
+
+#根据egg第一和第二列的标题提取前两列。
+gene_info <- egg %>%dplyr::select(GID = X.query, GENENAME = seed_ortholog) %>% na.omit() 
+
+#根据egg第一列和GO列的标题提取基因的GO注释。后面的`%>% filter(str_detect(GO,"GO"))`是筛选GO列值包含"GO"的行，删除空值。
+goterms <- egg %>%
+  dplyr::select(X.query, GOs) %>%
+  na.omit() %>%
+  filter(str_detect(GOs, "GO:"))
+
+#分隔goterms的GOs值，逗号是分隔符
+all_go_list=str_split(goterms$GOs,",") 
+
+#注释换成单个GO编号一行的格式。eggnog里每个基因一行注释，GOs注释里可能有多个GO编号信息，要转换成每个GO编号一行的格式（看下面）。
+gene2go <- data.frame(GID = rep(goterms$X.query, times = sapply(all_go_list, length)), GO = unlist(all_go_list), EVIDENCE = "IEA") %>% filter(str_detect(GO,"GO")) 
+
+#保存成文件gene2go.txt
+write.table(gene2go,file="gene2go.txt",sep="\t",row.names=F,quote=F) 
+
+#根据egg第一列和KEGG_ko列的标题提取基因的KEGG注释。
+koterms <- egg %>%dplyr::select(GID = X.query, KO=KEGG_ko)%>%na.omit()%>% filter(str_detect(KO,"ko")) 
+
+#下载kegg与KO对应的文件，https://www.genome.jp/kegg-bin/get_htext?ko00001
+#运行这个脚本
+#Rscript ko_json2data.R ，直接运行，得到"kegg_info.RData"
+#加载这个文件
+load("E:/AAA/R/16_4_R/kegg_info.RData")
+
+#把ko2pathway的列名改为KO和Pathway，与koterms一致。
+colnames(ko2pathway)=c("KO",'Pathway') 
+
+#把koterms的KO值的前缀ko:去掉，与ko2pathway格式一致。
+koterms$KO=str_replace_all(koterms$KO,"ko:","") 
+
+#合并koterms和ko2pathway到gene2pathway，将基因与pathway的对应关系整理出来
+gene2pathway <- koterms %>% left_join(ko2pathway, by = "KO") %>%dplyr::select(GID, Pathway) %>%na.omit() 
+
+#合并gene2pathway和pathway2name
+gene2pathway_name<-left_join(gene2pathway,pathway2name,by="Pathway") 
+
+#【optional】保存成文件gene2pathway_name.txt，可以给通用KEGG富集分析用
+write.table(gene2pathway_name,file="gene2pathway_name.txt",sep="\t",row.names=F,quote=F) 
+
+#去除重复的行
+gene_info <- distinct(gene_info)
+gene2go <- distinct(gene2go)
+koterms <- distinct(koterms)
+gene2pathway <- distinct(gene2pathway)
+
+#构建org文件
+makeOrgPackage(gene_info=gene_info, go=gene2go, ko=koterms,  
+               pathway=gene2pathway, version="0.0.1", 
+               maintainer='shizhaohui <zhaohui1019847069@163.com>', 
+               author='shizhaohui',
+               outputDir="E:/AAA/R/", 
+               tax_id="39947", 
+               genus="Schlechtendalia", 
+               species="Chinensis",
+               goTable="go")
+install.packages('E:/AAA/R/org.SChinensis.eg.db/',repos = NULL, type="source") #安装包
+library(org.SChinensis.eg.db) #加载包
