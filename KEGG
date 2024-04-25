@@ -1,0 +1,59 @@
+library(AnnotationForge)
+library(dplyr)
+library(stringr)
+library(jsonlite)
+# 清除变量信息
+rm(list=ls())
+# 重新设置你的工作目录，你可以把它设置为数据文件所在的目录
+setwd("E:/AAA/R/16_4_R/")
+
+# step1: 读取目标基因文件
+genes <- read.csv(file = './transcript_count_matrix.csv', header = T,sep=',')
+geneList <- genes[, 1]
+
+# step2: 执行富集检验
+ego <- enrichGO(gene          = geneList,
+                OrgDb         = org.SChinensis.eg.db,
+                ont           = "ALL",
+                keyType       = 'GID',
+                pAdjustMethod = "fdr",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 0.2
+                )
+head(ego)
+
+setwd("Z:/2nature/fengqingkai")
+# step3: 结果分析和可视化
+## 保存结果
+write.csv(ego, paste("output", "top_1000_clusterProfiler.csv", sep = "_"), row.names = FALSE)
+
+## Bar plot
+p1 <- barplot(ego, showCategory=10)
+ggsave("GO_barplot.png", width=7, height=7)
+ggsave("GO_barplot.pdf", width=7, height=7)
+
+## Dot plot
+p2 <- dotplot(ego, showCategory=10)
+ggsave("GO_Dotplot.png", width=8, height=7)
+ggsave("GO_Dotplot.pdf", width=8, height=7)
+
+## Gene-Concept Network
+p3 <- cnetplot(ego)
+ggsave("cnetplot.pdf",width = 8,height = 7)
+## Enrichment Map
+#install.packages('ggnewscale')
+library(enrichplot)
+
+ego <- pairwise_termsim(ego)
+p4 <- emapplot(ego)
+ggsave("emapplot.pdf",width = 8,height = 7)
+
+
+kegg <- enrichKEGG(
+  gene = genes,  #基因列表文件中的基因名称
+  keyType = 'kegg',  #kegg 富集
+  organism = 'Sch',  #例如，Sch 代表角倍蚜
+  pAdjustMethod = 'fdr',  #指定 p 值校正方法
+  pvalueCutoff = 0.05,  #指定 p 值阈值，不显著的值将不显示在结果中
+  qvalueCutoff = 0.2,  #指定 q 值阈值，不显著的值将不显示在结果中
+)
