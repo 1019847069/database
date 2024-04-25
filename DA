@@ -1,0 +1,61 @@
+library(edgeR)
+library(statmod)
+library(fdrtool)
+
+setwd("E:/AAA/R/16_4_R/")
+# 读取数据
+data <- read.table("E:/AAA/R/R zh/transcript_count_matrix.csv",sep = ",",header = T)
+
+body_sg_data <- data[, c(2, 4)]
+gut_sg_data <- data[, c(3, 4)]
+gene_info <- data[,c(1)]
+
+group_body_sg <- factor(c('Body',  'Sg'))
+y <- DGEList(counts = body_sg_data, genes = gene_info, group = group_body_sg)
+keep <- rowSums(cpm(y)>1) >= 1
+y <- y[keep, , keep.lib.sizes=FALSE]
+y <- calcNormFactors(y)
+y_bcv <- y
+bcv <- 0.4
+et <- exactTest(y_bcv, dispersion = bcv ^ 2)
+
+
+gene1 <- decideTestsDGE(et, p.value = 0.005, lfc = 0)
+summary(gene1)
+View(body_sg_data)
+y <- DGEList(counts = body_sg_data, genes = gene_info, group = group_body_sg)
+keep <- rowSums(cpm(y)>1) >= 1
+y <- y[keep, , keep.lib.sizes=FALSE]
+y <- calcNormFactors(y)
+y_bcv <- y
+bcv <- 0.4
+et <- exactTest(y_bcv, dispersion = bcv ^ 2)
+
+results_b_s <- cbind(y$genes,y$counts,et$table,gene1)
+write.csv(results_b_s, file = "ref_body_sg.mmc.csv", row.names = FALSE)
+
+
+
+
+group_gut_sg <- factor(c('Gut', 'Sg'))
+z <- DGEList(counts = gut_sg_data, genes = gene_info, group = group_gut_sg)
+keep <- rowSums(cpm(z)>1) >= 1
+z <- z[keep, , keep.lib.sizes=FALSE]
+z <- calcNormFactors(z)
+z_dcv <- z
+dcv <- 0.4
+et <- exactTest(z_dcv, dispersion = dcv ^ 2)
+
+gene2 <- decideTestsDGE(et, p.value = 0.005, lfc = 0)
+summary(gene2)
+View(gut_sg_data)
+z <- DGEList(counts = gut_sg_data, genes = gene_info, group = group_gut_sg)
+keep <- rowSums(cpm(z)>1) >= 1
+z <- z[keep, , keep.lib.sizes=FALSE]
+z <- calcNormFactors(z)
+z_dcv <- z
+dcv <- 0.4
+et <- exactTest(z_dcv, dispersion = dcv ^ 2)
+
+results_g_s <- cbind(z$genes,z$counts,et$table,gene2)
+write.csv(results_g_s, file = "ref_gut_sg.mmc.csv", row.names = FALSE)
